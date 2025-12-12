@@ -1,8 +1,8 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import routes from './routes/index.js';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import routes from "./routes/index.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 /**
  * Main Express application instance.
@@ -10,33 +10,47 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
  */
 const app: express.Application = express();
 
-// Security headers
+/**
+ * Security middleware to set various HTTP headers for security.
+ */
 app.use(helmet());
 
-// Enable CORS for cross-origin requests
+/**
+ * CORS middleware to enable cross-origin resource sharing.
+ */
 app.use(cors());
 
-// Parse JSON request bodies
-app.use(express.json({ limit: '10mb' }));
+/**
+ * JSON parsing middleware with a 10MB limit.
+ */
+app.use(express.json({ limit: "10mb" }));
 
-// Parse URL-encoded request bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+/**
+ * URL-encoded parsing middleware with a 10MB limit.
+ */
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 /**
  * Root route handler.
  * Responds with a simple greeting message.
  */
-app.get('/', (req, res) => {
-  res.send('Hello World!');
+app.get("/", (req, res) => {
+  res.send("Hello World!");
 });
 
-// Mount API routes under /api path
-app.use('/api', routes);
+/**
+ * API routes middleware, mounting all API endpoints under /api.
+ */
+app.use("/api", routes);
 
-// Handle 404 errors for unmatched routes
+/**
+ * 404 not found handler for unmatched routes.
+ */
 app.use(notFoundHandler);
 
-// Global error handling middleware
+/**
+ * Global error handler middleware.
+ */
 app.use(errorHandler);
 
 export default app;

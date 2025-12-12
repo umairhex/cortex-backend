@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+import { config } from "./index.js";
 
 /**
  * Connects to the MongoDB database using Mongoose.
@@ -7,11 +8,10 @@ import mongoose from 'mongoose';
  */
 const connectDB = async (): Promise<void> => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cortex-backend';
-    await mongoose.connect(mongoURI);
-    console.log('MongoDB connected successfully');
+    await mongoose.connect(config.mongoURI);
+    console.log("MongoDB connected successfully");
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error("MongoDB connection error:", error);
     process.exit(1);
   }
 };
