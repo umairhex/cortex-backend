@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
@@ -18,7 +19,17 @@ app.use(helmet());
 /**
  * CORS middleware to enable cross-origin resource sharing.
  */
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+  })
+);
+
+/**
+ * Cookie parser middleware.
+ */
+app.use(cookieParser());
 
 /**
  * JSON parsing middleware with a 10MB limit.

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config/index.js";
+import User from "../models/User.js";
 
 /**
  * Extended Request interface to include user.
@@ -35,12 +36,35 @@ export const authenticateToken = (
     /**
      * JWT verification callback.
      * Handles token verification result.
-     */ (err, user) => {
+     */ async (err, decoded: any) => {
       if (err) {
         return res.status(403).json({ message: "Invalid token" });
       }
-      req.user = user;
-      next();
+      
+      try {
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+             return res.status(404).json({ message: "User not found" });
+        }
+        req.user = user;
+        next();
+      } catch (error) {
+         console.error("Auth middleware error:", error);
+         return res.status(500).json({ message: "Internal server error" });
+      }
     }
   );
+};
+
+/**
+ * Middleware to authorize users based on roles.
+ * @param roles - Array of allowed roles.
+ */
+export const authorizeRoles = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    next();
+  };
 };

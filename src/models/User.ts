@@ -13,6 +13,7 @@ export interface IUser extends Document {
   resetTokenExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
+  role: 'user' | 'admin';
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -42,6 +43,11 @@ const userSchema = new mongoose.Schema(
     },
     resetTokenExpiry: {
       type: Date,
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'admin',
     },
   },
   {

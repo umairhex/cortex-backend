@@ -1,18 +1,20 @@
 import express from "express";
 import { getHealth } from "./health.js";
 import {
-  signup,
-  signin,
-  signupValidation,
-  signinValidation,
-  refresh,
-  logout,
-  forgotPassword,
-  resetPassword,
-  forgotPasswordValidation,
-  resetPasswordValidation,
+    signup,
+    signin,
+    signupValidation,
+    signinValidation,
+    refresh,
+    logout,
+    forgotPassword,
+    resetPassword,
+    forgotPasswordValidation,
+    resetPasswordValidation,
 } from "../controllers/auth.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { createCollection, getCollections, getCollectionById, updateCollection, deleteCollection } from "../controllers/collection.js";
+import { createItem, getItems, getItemById, updateItem, deleteItem } from "../controllers/item.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 import { authRateLimit } from "../middleware/rateLimit.js";
 import User from "../models/User.js";
 
@@ -73,7 +75,7 @@ router.get(
    * Retrieves the authenticated user's profile data.
    */ async (req, res) => {
     try {
-      const user = await User.findById(req.user.userId).select(
+      const user = await User.findById(req.user._id).select(
         "-password -refreshToken"
       );
       if (!user) {
@@ -86,5 +88,50 @@ router.get(
     }
   }
 );
+
+/**
+ * Create collection route, requires authentication.
+ */
+
+router.post("/collections", authenticateToken, authorizeRoles("admin"), createCollection);
+
+/**
+ * Get all collections route, requires authentication.
+ */
+router.get("/collections", authenticateToken, getCollections);
+
+/**
+ * Get collection by ID route, requires authentication.
+ */
+router.get("/collections/:id", authenticateToken, getCollectionById);
+
+/**
+ * Update collection by ID route, requires authentication.
+ */
+router.put("/collections/:id", authenticateToken, authorizeRoles("admin"), updateCollection);
+
+/**
+ * Delete collection by ID route, requires authentication.
+ */
+router.delete("/collections/:id", authenticateToken, authorizeRoles("admin"), deleteCollection);
+
+/**
+ * Item Routes
+ */
+
+
+router.post("/collections/:collectionId/items", authenticateToken, createItem);
+
+
+router.get("/collections/:collectionId/items", authenticateToken, getItems);
+
+
+router.get("/items/:id", authenticateToken, getItemById);
+
+
+router.put("/items/:id", authenticateToken, updateItem);
+
+
+router.delete("/items/:id", authenticateToken, deleteItem);
 
 export default router;

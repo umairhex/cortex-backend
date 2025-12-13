@@ -11,15 +11,26 @@ import { config } from "../config/index.js";
  * Generates access and refresh tokens.
  */
 const generateTokens = (userId: string) => {
-  // @ts-ignore
   const accessToken = jwt.sign({ userId }, config.jwtSecret, {
-    expiresIn: config.jwtExpiry,
+    expiresIn: config.jwtExpiry as any,
   });
-  // @ts-ignore
   const refreshToken = jwt.sign({ userId }, config.refreshTokenSecret, {
-    expiresIn: config.refreshTokenExpiry,
+    expiresIn: config.refreshTokenExpiry as any,
   });
   return { accessToken, refreshToken };
+};
+
+/**
+ * Sets the refresh token as an HTTP-only cookie.
+ */
+const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/"
+  });
 };
 
 /**
@@ -27,7 +38,7 @@ const generateTokens = (userId: string) => {
  */
 export const signupValidation = [
   body("email").isEmail().normalizeEmail(),
-  body("password").isLength({ min: 6 }),
+  body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
 ];
 
 /**
@@ -51,15 +62,21 @@ export const signup = async (req: Request, res: Response) => {
     const user = new User({ email, password });
     await user.save();
 
+   
     const { accessToken, refreshToken } = generateTokens(user._id.toString());
+    
+   
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
     user.refreshToken = hashedRefreshToken;
+    
+   
     await user.save();
+
+    setRefreshTokenCookie(res, refreshToken);
 
     res.status(201).json({
       message: "User created successfully",
       accessToken,
-      refreshToken,
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -72,7 +89,7 @@ export const signup = async (req: Request, res: Response) => {
  */
 export const signinValidation = [
   body("email").isEmail().normalizeEmail(),
-  body("password").exists(),
+  body("password").exists().withMessage("Password is required"),
 ];
 
 /**
@@ -103,7 +120,9 @@ export const signin = async (req: Request, res: Response) => {
     user.refreshToken = hashedRefreshToken;
     await user.save();
 
-    res.json({ message: "Signin successful", accessToken, refreshToken });
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.json({ message: "Signin successful", accessToken });
   } catch (error) {
     console.error("Signin error:", error);
     res.status(500).json({ message: "Server error" });
@@ -112,12 +131,14 @@ export const signin = async (req: Request, res: Response) => {
 
 /**
  * Refresh token handler.
- * Generates new access token using valid refresh token.
+ * Generates new access token using valid refresh token from cookie.
  */
 export const refresh = async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies.refreshToken;
+  console.log("Refresh Request - Cookie present:", !!refreshToken);
 
   if (!refreshToken) {
+    console.log("Refresh failed: No token in cookie");
     return res.status(401).json({ message: "Refresh token required" });
   }
 
@@ -128,6 +149,7 @@ export const refresh = async (req: Request, res: Response) => {
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.refreshToken) {
+      console.log("Refresh failed: User not found or no token in DB", { userId: decoded.userId, hasToken: !!user?.refreshToken });
       return res.status(403).json({ message: "Invalid refresh token" });
     }
 
@@ -136,6 +158,7 @@ export const refresh = async (req: Request, res: Response) => {
       user.refreshToken
     );
     if (!isValidRefreshToken) {
+      console.log("Refresh failed: Token mismatch/reuse detected");
       return res.status(403).json({ message: "Invalid refresh token" });
     }
 
@@ -146,7 +169,10 @@ export const refresh = async (req: Request, res: Response) => {
     user.refreshToken = hashedRefreshToken;
     await user.save();
 
-    res.json({ accessToken, refreshToken: newRefreshToken });
+    setRefreshTokenCookie(res, newRefreshToken);
+    console.log("Refresh success: New tokens generated");
+
+    res.json({ accessToken });
   } catch (error) {
     console.error("Refresh token error:", error);
     res.status(403).json({ message: "Invalid refresh token" });
@@ -155,13 +181,13 @@ export const refresh = async (req: Request, res: Response) => {
 
 /**
  * Logout handler.
- * Invalidates the refresh token.
+ * Invalidates the refresh token and clears cookie.
  */
 export const logout = async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
-    return res.status(400).json({ message: "Refresh token required" });
+    return res.status(200).json({ message: "Logged out" });
   }
 
   try {
@@ -175,10 +201,13 @@ export const logout = async (req: Request, res: Response) => {
       await user.save();
     }
 
+    res.clearCookie("refreshToken");
     res.json({ message: "Logout successful" });
   } catch (error) {
     console.error("Logout error:", error);
-    res.status(500).json({ message: "Server error" });
+   
+    res.clearCookie("refreshToken");
+    res.json({ message: "Logout successful" });
   }
 };
 
@@ -204,6 +233,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
+     
       return res.json({
         message:
           "If an account with that email exists, a reset link has been sent.",
@@ -211,9 +241,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
     const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    user.resetToken = resetToken;
+    user.resetToken = hashedResetToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
 
@@ -258,8 +292,13 @@ export const resetPassword = async (req: Request, res: Response) => {
   const { token, password } = req.body;
 
   try {
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
     const user = await User.findOne({
-      resetToken: token,
+      resetToken: hashedResetToken,
       resetTokenExpiry: { $gt: new Date() },
     });
 
