@@ -1,119 +1,121 @@
-import type { Request, Response } from 'express';
-import Item from '../models/Item.js';
-import { Collection } from '../models/CollectionTypes.js';
+import type { Request, Response } from "express";
+import { getStorageAdapter } from "../services/storage.js";
 
-/**
- * Create a new item in a collection.
- * POST /api/collections/:collectionId/items
- */
 export const createItem = async (req: Request, res: Response) => {
-  const { collectionId } = req.params;
-  const { data } = req.body;
+	const collectionId = req.params.collectionId as string;
+	const { data } = req.body;
 
-  try {
-   
-    const collection = await Collection.findOne({ id: collectionId });
-    if (!collection) {
-      return res.status(404).json({ message: 'Collection not found' });
-    }
+	try {
+		const { adapter, tableName } = await getStorageAdapter(collectionId);
 
-   
-   
-   
-   
-    
-    const newItem = new Item({
-      collectionId,
-      data: data || {},
-    });
+		if (!adapter || !tableName) {
+			return res.status(400).json({
+				message:
+					"Database integration required. Please configure MongoDB, PostgreSQL, or Supabase in API Integration settings.",
+				code: "NO_INTEGRATION",
+			});
+		}
 
-    await newItem.save();
-    res.status(201).json(newItem);
-  } catch (error) {
-    console.error('Error creating item:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+		const result = await adapter.createItem(tableName, data || {});
+		await adapter.disconnect();
+		return res.status(201).json(result);
+	} catch (error) {
+		console.error("Error creating item:", error);
+		res.status(500).json({ message: "Server error" });
+	}
 };
 
-/**
- * Get all items for a specific collection.
- * GET /api/collections/:collectionId/items
- */
 export const getItems = async (req: Request, res: Response) => {
-  const { collectionId } = req.params;
+	const collectionId = req.params.collectionId as string;
 
-  try {
-    const items = await Item.find({ collectionId }).sort({ createdAt: -1 });
-    res.json(items);
-  } catch (error) {
-    console.error('Error fetching items:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+	try {
+		const { adapter, tableName } = await getStorageAdapter(collectionId);
+
+		if (!adapter || !tableName) {
+			return res.status(400).json({
+				message: "Database integration required.",
+				code: "NO_INTEGRATION",
+			});
+		}
+
+		const items = await adapter.getItems(tableName, {}, { sort: { _id: -1 } });
+		await adapter.disconnect();
+		return res.json(items);
+	} catch (error) {
+		console.error("Error fetching items:", error);
+		res.status(500).json({ message: "Server error" });
+	}
 };
 
-/**
- * Get a single item by ID.
- * GET /api/items/:id
- */
 export const getItemById = async (req: Request, res: Response) => {
-  const { id } = req.params;
+	const id = req.params.id as string;
+	const collectionId = req.params.collectionId as string;
 
-  try {
-    const item = await Item.findById(id);
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
-    res.json(item);
-  } catch (error) {
-    console.error('Error fetching item:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+	try {
+		const { adapter, tableName } = await getStorageAdapter(collectionId);
+
+		if (!adapter || !tableName) {
+			return res.status(400).json({
+				message: "Database integration required.",
+				code: "NO_INTEGRATION",
+			});
+		}
+
+		const item = await adapter.getItem(tableName, id);
+		await adapter.disconnect();
+		if (!item) return res.status(404).json({ message: "Item not found" });
+		return res.json(item);
+	} catch (error) {
+		console.error("Error fetching item:", error);
+		res.status(500).json({ message: "Server error" });
+	}
 };
 
-/**
- * Update an item by ID.
- * PUT /api/items/:id
- */
 export const updateItem = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { data } = req.body;
+	const id = req.params.id as string;
+	const collectionId = req.params.collectionId as string;
+	const { data } = req.body;
 
-  try {
-    const item = await Item.findByIdAndUpdate(
-      id,
-      { 
-        $set: { data }
-      },
-      { new: true }
-    );
+	try {
+		const { adapter, tableName } = await getStorageAdapter(collectionId);
 
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
+		if (!adapter || !tableName) {
+			return res.status(400).json({
+				message: "Database integration required.",
+				code: "NO_INTEGRATION",
+			});
+		}
 
-    res.json(item);
-  } catch (error) {
-    console.error('Error updating item:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+		const result = await adapter.updateItem(tableName, id, data);
+		await adapter.disconnect();
+		if (!result) return res.status(404).json({ message: "Item not found" });
+		return res.json(result);
+	} catch (error) {
+		console.error("Error updating item:", error);
+		res.status(500).json({ message: "Server error" });
+	}
 };
 
-/**
- * Delete an item by ID.
- * DELETE /api/items/:id
- */
 export const deleteItem = async (req: Request, res: Response) => {
-  const { id } = req.params;
+	const id = req.params.id as string;
+	const collectionId = req.params.collectionId as string;
 
-  try {
-    const item = await Item.findByIdAndDelete(id);
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
+	try {
+		const { adapter, tableName } = await getStorageAdapter(collectionId);
 
-    res.json({ message: 'Item deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting item:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+		if (!adapter || !tableName) {
+			return res.status(400).json({
+				message: "Database integration required.",
+				code: "NO_INTEGRATION",
+			});
+		}
+
+		const result = await adapter.deleteItem(tableName, id);
+		await adapter.disconnect();
+		if (!result) return res.status(404).json({ message: "Item not found" });
+		return res.json({ message: "Item deleted successfully" });
+	} catch (error) {
+		console.error("Error deleting item:", error);
+		res.status(500).json({ message: "Server error" });
+	}
 };
