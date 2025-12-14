@@ -1,16 +1,17 @@
 import express from "express";
+import uploadRoutes from "./upload.js";
 import { getHealth } from "./health.js";
 import {
-    signup,
-    signin,
-    signupValidation,
-    signinValidation,
-    refresh,
-    logout,
-    forgotPassword,
-    resetPassword,
-    forgotPasswordValidation,
-    resetPasswordValidation,
+  signup,
+  signin,
+  signupValidation,
+  signinValidation,
+  refresh,
+  logout,
+  forgotPassword,
+  resetPassword,
+  forgotPasswordValidation,
+  resetPasswordValidation,
 } from "../controllers/auth.js";
 import { createCollection, getCollections, getCollectionById, updateCollection, deleteCollection } from "../controllers/collection.js";
 import { createItem, getItems, getItemById, updateItem, deleteItem } from "../controllers/item.js";
@@ -28,6 +29,8 @@ const router: express.Router = express.Router();
  * Health check route.
  */
 router.get("/health", getHealth);
+
+router.use("/upload", uploadRoutes);
 
 /**
  * User signup route with rate limiting and validation.

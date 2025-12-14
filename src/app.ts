@@ -14,7 +14,9 @@ const app: express.Application = express();
 /**
  * Security middleware to set various HTTP headers for security.
  */
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 /**
  * CORS middleware to enable cross-origin resource sharing.
@@ -40,6 +42,13 @@ app.use(express.json({ limit: "10mb" }));
  * URL-encoded parsing middleware with a 10MB limit.
  */
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 /**
  * Root route handler.
