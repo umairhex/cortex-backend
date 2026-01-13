@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import connectDB from "./config/database.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import routes from "./routes/index.js";
 
@@ -21,23 +22,49 @@ app.use(
 );
 
 /**
+ * Allowed origins for CORS.
+ */
+const allowedOrigins = [
+	process.env.FRONTEND_URL,
+].filter(Boolean);
+
+/**
  * CORS middleware to enable cross-origin resource sharing.
  */
 app.use(
 	cors({
-		origin: [
-			"http://localhost:5173",
-			"http://127.0.0.1:5173",
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"http://localhost:8000",
-			"http://localhost:4321",
-			/https:\/\/.*\.vercel\.app$/,
-			/https:\/\/.*\.netlify\.app$/,
-		],
+		origin: (origin, callback) => {
+			// Allow requests with no origin (mobile apps, curl, etc.)
+			if (!origin) return callback(null, true);
+
+			// Check if origin matches allowed patterns
+			if (
+				allowedOrigins.includes(origin) ||
+				/https:\/\/.*\.vercel\.app$/.test(origin) ||
+				/https:\/\/.*\.netlify\.app$/.test(origin)
+			) {
+				return callback(null, true);
+			}
+
+			callback(new Error("Not allowed by CORS"));
+		},
 		credentials: true,
 	}),
 );
+
+/**
+ * Database connection middleware for serverless environments.
+ * Ensures database is connected before processing requests.
+ */
+app.use(async (_req, res, next) => {
+	try {
+		await connectDB();
+		next();
+	} catch (error) {
+		console.error("ERROR: Database connection failed in middleware:", error);
+		res.status(500).json({ message: "Database connection failed" });
+	}
+});
 
 /**
  * Cookie parser middleware.
