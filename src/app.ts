@@ -26,7 +26,12 @@ app.use(
  */
 const allowedOrigins = [
 	process.env.FRONTEND_URL,
+	"https://cortex.umairrx.dev", // Add explicit origin for debugging
 ].filter(Boolean);
+
+console.log("CORS Configuration:");
+console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log("Allowed origins:", allowedOrigins);
 
 /**
  * CORS middleware to enable cross-origin resource sharing.
@@ -34,6 +39,8 @@ const allowedOrigins = [
 app.use(
 	cors({
 		origin: (origin, callback) => {
+			console.log("CORS check for origin:", origin);
+
 			// Allow requests with no origin (mobile apps, curl, etc.)
 			if (!origin) return callback(null, true);
 
@@ -41,11 +48,14 @@ app.use(
 			if (
 				allowedOrigins.includes(origin) ||
 				/https:\/\/.*\.vercel\.app$/.test(origin) ||
-				/https:\/\/.*\.netlify\.app$/.test(origin)
+				/https:\/\/.*\.netlify\.app$/.test(origin) ||
+				origin === "https://cortex.umairrx.dev" // Explicit check for the frontend
 			) {
+				console.log("CORS allowed for origin:", origin);
 				return callback(null, true);
 			}
 
+			console.log("CORS blocked for origin:", origin);
 			callback(new Error("Not allowed by CORS"));
 		},
 		credentials: true,
