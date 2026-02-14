@@ -5,10 +5,15 @@ import multer from "multer";
 /**
  * Upload directory.
  * Creates directory if it doesn't exist.
+ * Uses /tmp for Vercel serverless compatibility
  */
-const uploadDir = "uploads";
-if (!fs.existsSync(uploadDir)) {
-	fs.mkdirSync(uploadDir, { recursive: true });
+const uploadDir = process.env.VERCEL ? "/tmp/uploads" : "uploads";
+try {
+	if (!fs.existsSync(uploadDir)) {
+		fs.mkdirSync(uploadDir, { recursive: true });
+	}
+} catch (error) {
+	console.warn("Could not create upload directory:", error);
 }
 
 /**

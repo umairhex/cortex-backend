@@ -86,7 +86,10 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Serve uploaded files - use /tmp/uploads on Vercel, regular uploads locally
+const uploadsPath = process.env.VERCEL ? "/tmp/uploads" : path.join(__dirname, "../uploads");
+app.use("/uploads", express.static(uploadsPath));
 
 /**
  * Health
