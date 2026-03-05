@@ -11,52 +11,56 @@ import User from "../models/User.js";
  * Generates access and refresh tokens.
  */
 const generateTokens = (userId: string) => {
-	const accessToken = jwt.sign({ userId }, config.jwtSecret, {
-		// biome-ignore lint/suspicious/noExplicitAny: Config expiry type mismatch
-		expiresIn: config.jwtExpiry as any,
-	});
-	const refreshToken = jwt.sign({ userId }, config.refreshTokenSecret, {
-		// biome-ignore lint/suspicious/noExplicitAny: Config expiry type mismatch
-		expiresIn: config.refreshTokenExpiry as any,
-	});
-	return { accessToken, refreshToken };
+  const accessToken = jwt.sign({ userId }, config.jwtSecret, {
+    // biome-ignore lint/suspicious/noExplicitAny: Config expiry type mismatch
+    expiresIn: config.jwtExpiry as any,
+  });
+  const refreshToken = jwt.sign({ userId }, config.refreshTokenSecret, {
+    // biome-ignore lint/suspicious/noExplicitAny: Config expiry type mismatch
+    expiresIn: config.refreshTokenExpiry as any,
+  });
+  return { accessToken, refreshToken };
 };
 
 /**
  * Sets the tokens as HTTP-only cookies.
  */
 const setTokenCookies = (
-	res: Response,
-	accessToken: string,
-	refreshToken: string,
+  res: Response,
+  accessToken: string,
+  refreshToken: string,
 ) => {
-	const isProduction = process.env.NODE_ENV === "production";
+  const isProduction = process.env.NODE_ENV === "production";
 
-	res.cookie("refreshToken", refreshToken, {
-		httpOnly: true,
-		secure: isProduction,
-		sameSite: "lax",
-		maxAge: 7 * 24 * 60 * 60 * 1000,
-		path: "/",
-	});
+  // SameSite=None is required for cross-origin cookie sharing (frontend/backend on different domains).
+  // SameSite=None mandates Secure=true, which is already true in production.
+  const sameSite = isProduction ? "none" : "lax";
 
-	res.cookie("accessToken", accessToken, {
-		httpOnly: true,
-		secure: isProduction,
-		sameSite: "lax",
-		maxAge: 15 * 60 * 1000,
-		path: "/",
-	});
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite,
+    maxAge: 15 * 60 * 1000,
+    path: "/",
+  });
 };
 
 /**
  * Validation rules for signup.
  */
 export const signupValidation = [
-	body("email").isEmail().normalizeEmail(),
-	body("password")
-		.isLength({ min: 6 })
-		.withMessage("Password must be at least 6 characters"),
+  body("email").isEmail().normalizeEmail(),
+  body("password")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters"),
 ];
 
 /**
@@ -64,53 +68,53 @@ export const signupValidation = [
  * Creates a new user account and returns tokens via cookies.
  */
 export const signup = async (req: Request, res: Response) => {
-	const errors = validationResult(req);
-	if (!errors.isEmpty()) {
-		return res.status(400).json({ errors: errors.array() });
-	}
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-	const { email, password } = req.body;
+  const { email, password } = req.body;
 
-	try {
-		const existingUser = await User.findOne({ email });
-		if (existingUser) {
-			return res.status(400).json({ message: "User already exists" });
-		}
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
-		const userCount = await User.countDocuments();
-		if (userCount > 0) {
-			return res.status(403).json({
-				message:
-					"Signup is disabled. Access is restricted to the workspace owner.",
-			});
-		}
+    const userCount = await User.countDocuments();
+    if (userCount > 0) {
+      return res.status(403).json({
+        message:
+          "Signup is disabled. Access is restricted to the workspace owner.",
+      });
+    }
 
-		const user = new User({ email, password, role: "admin" });
-		await user.save();
+    const user = new User({ email, password, role: "admin" });
+    await user.save();
 
-		const { accessToken, refreshToken } = generateTokens(user._id.toString());
-		const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
-		user.refreshToken = hashedRefreshToken;
-		await user.save();
+    const { accessToken, refreshToken } = generateTokens(user._id.toString());
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
 
-		setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(res, accessToken, refreshToken);
 
-		res.status(201).json({
-			message: "User created successfully",
-			user: { email: user.email, role: user.role },
-		});
-	} catch (error) {
-		console.error("Signup error:", error);
-		res.status(500).json({ message: "Server error" });
-	}
+    res.status(201).json({
+      message: "User created successfully",
+      user: { email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error("Signup error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /**
  * Validation rules for signin.
  */
 export const signinValidation = [
-	body("email").isEmail().normalizeEmail(),
-	body("password").exists().withMessage("Password is required"),
+  body("email").isEmail().normalizeEmail(),
+  body("password").exists().withMessage("Password is required"),
 ];
 
 /**
@@ -118,39 +122,39 @@ export const signinValidation = [
  * Authenticates user and sets token cookies.
  */
 export const signin = async (req: Request, res: Response) => {
-	const errors = validationResult(req);
-	if (!errors.isEmpty()) {
-		return res.status(400).json({ errors: errors.array() });
-	}
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-	const { email, password } = req.body;
+  const { email, password } = req.body;
 
-	try {
-		const user = await User.findOne({ email });
-		if (!user) {
-			return res.status(400).json({ message: "Invalid credentials" });
-		}
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-		const isMatch = await user.comparePassword(password);
-		if (!isMatch) {
-			return res.status(400).json({ message: "Invalid credentials" });
-		}
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-		const { accessToken, refreshToken } = generateTokens(user._id.toString());
-		const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
-		user.refreshToken = hashedRefreshToken;
-		await user.save();
+    const { accessToken, refreshToken } = generateTokens(user._id.toString());
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
 
-		setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(res, accessToken, refreshToken);
 
-		res.json({
-			message: "Signin successful",
-			user: { email: user.email, role: user.role },
-		});
-	} catch (error) {
-		console.error("Signin error:", error);
-		res.status(500).json({ message: "Server error" });
-	}
+    res.json({
+      message: "Signin successful",
+      user: { email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error("Signin error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /**
@@ -158,44 +162,44 @@ export const signin = async (req: Request, res: Response) => {
  * Generates new access token using valid refresh token from cookie.
  */
 export const refresh = async (req: Request, res: Response) => {
-	const refreshToken = req.cookies.refreshToken;
+  const refreshToken = req.cookies.refreshToken;
 
-	if (!refreshToken) {
-		return res.status(401).json({ message: "Refresh token required" });
-	}
+  if (!refreshToken) {
+    return res.status(401).json({ message: "Refresh token required" });
+  }
 
-	try {
-		const decoded = jwt.verify(refreshToken, config.refreshTokenSecret) as {
-			userId: string;
-		};
-		const user = await User.findById(decoded.userId);
+  try {
+    const decoded = jwt.verify(refreshToken, config.refreshTokenSecret) as {
+      userId: string;
+    };
+    const user = await User.findById(decoded.userId);
 
-		if (!user || !user.refreshToken) {
-			return res.status(403).json({ message: "Invalid refresh token" });
-		}
+    if (!user || !user.refreshToken) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
 
-		const isValidRefreshToken = await bcrypt.compare(
-			refreshToken,
-			user.refreshToken,
-		);
-		if (!isValidRefreshToken) {
-			return res.status(403).json({ message: "Invalid refresh token" });
-		}
+    const isValidRefreshToken = await bcrypt.compare(
+      refreshToken,
+      user.refreshToken,
+    );
+    if (!isValidRefreshToken) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
 
-		const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-			user._id.toString(),
-		);
-		const hashedRefreshToken = await bcrypt.hash(newRefreshToken, 12);
-		user.refreshToken = hashedRefreshToken;
-		await user.save();
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(
+      user._id.toString(),
+    );
+    const hashedRefreshToken = await bcrypt.hash(newRefreshToken, 12);
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
 
-		setTokenCookies(res, accessToken, newRefreshToken);
+    setTokenCookies(res, accessToken, newRefreshToken);
 
-		res.json({ message: "Token refreshed" });
-	} catch (error) {
-		console.error("Refresh token error:", error);
-		res.status(403).json({ message: "Invalid refresh token" });
-	}
+    res.json({ message: "Token refreshed" });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    res.status(403).json({ message: "Invalid refresh token" });
+  }
 };
 
 /**
@@ -203,40 +207,49 @@ export const refresh = async (req: Request, res: Response) => {
  * Invalidates the refresh token and clears cookie.
  */
 export const logout = async (req: Request, res: Response) => {
-	const refreshToken = req.cookies.refreshToken;
+  const refreshToken = req.cookies.refreshToken;
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? "none" : "lax") as "none" | "lax",
+    path: "/",
+  };
 
-	if (!refreshToken) {
-		return res.status(200).json({ message: "Logged out" });
-	}
+  if (!refreshToken) {
+    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("accessToken", cookieOptions);
+    return res.status(200).json({ message: "Logged out" });
+  }
 
-	try {
-		const decoded = jwt.verify(refreshToken, config.refreshTokenSecret) as {
-			userId: string;
-		};
-		const user = await User.findById(decoded.userId);
+  try {
+    const decoded = jwt.verify(refreshToken, config.refreshTokenSecret) as {
+      userId: string;
+    };
+    const user = await User.findById(decoded.userId);
 
-		if (user) {
-			user.refreshToken = undefined;
-			await user.save();
-		}
+    if (user) {
+      user.refreshToken = undefined;
+      await user.save();
+    }
 
-		res.clearCookie("refreshToken");
-		res.clearCookie("accessToken");
-		res.json({ message: "Logout successful" });
-	} catch (error) {
-		console.error("Logout error:", error);
+    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("accessToken", cookieOptions);
+    res.json({ message: "Logout successful" });
+  } catch (error) {
+    console.error("Logout error:", error);
 
-		res.clearCookie("refreshToken");
-		res.clearCookie("accessToken");
-		res.json({ message: "Logout successful" });
-	}
+    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("accessToken", cookieOptions);
+    res.json({ message: "Logout successful" });
+  }
 };
 
 /**
  * Validation rules for forgot password.
  */
 export const forgotPasswordValidation = [
-	body("email").isEmail().normalizeEmail(),
+  body("email").isEmail().normalizeEmail(),
 ];
 
 /**
@@ -244,59 +257,59 @@ export const forgotPasswordValidation = [
  * Sends a password reset email.
  */
 export const forgotPassword = async (req: Request, res: Response) => {
-	const errors = validationResult(req);
-	if (!errors.isEmpty()) {
-		return res.status(400).json({ errors: errors.array() });
-	}
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-	const { email } = req.body;
+  const { email } = req.body;
 
-	try {
-		const user = await User.findOne({ email });
-		if (!user) {
-			return res.json({
-				message:
-					"If an account with that email exists, a reset link has been sent.",
-			});
-		}
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+    }
 
-		const resetToken = crypto.randomBytes(32).toString("hex");
-		const hashedResetToken = crypto
-			.createHash("sha256")
-			.update(resetToken)
-			.digest("hex");
-		const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-		user.resetToken = hashedResetToken;
-		user.resetTokenExpiry = resetTokenExpiry;
-		await user.save();
+    user.resetToken = hashedResetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await user.save();
 
-		const transporter = nodemailer.createTransport(config.email);
-		const mailOptions = {
-			from: config.email.auth.user,
-			to: email,
-			subject: "Password Reset",
-			text: `You requested a password reset. Click the link to reset: http://localhost:${config.port}/reset-password?token=${resetToken}`,
-		};
+    const transporter = nodemailer.createTransport(config.email);
+    const mailOptions = {
+      from: config.email.auth.user,
+      to: email,
+      subject: "Password Reset",
+      text: `You requested a password reset. Click the link to reset: http://localhost:${config.port}/reset-password?token=${resetToken}`,
+    };
 
-		await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
-		res.json({
-			message:
-				"If an account with that email exists, a reset link has been sent.",
-		});
-	} catch (error) {
-		console.error("Forgot password error:", error);
-		res.status(500).json({ message: "Server error" });
-	}
+    res.json({
+      message:
+        "If an account with that email exists, a reset link has been sent.",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /**
  * Validation rules for reset password.
  */
 export const resetPasswordValidation = [
-	body("token").exists(),
-	body("password").isLength({ min: 6 }),
+  body("token").exists(),
+  body("password").isLength({ min: 6 }),
 ];
 
 /**
@@ -304,38 +317,38 @@ export const resetPasswordValidation = [
  * Resets the user's password using the reset token.
  */
 export const resetPassword = async (req: Request, res: Response) => {
-	const errors = validationResult(req);
-	if (!errors.isEmpty()) {
-		return res.status(400).json({ errors: errors.array() });
-	}
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-	const { token, password } = req.body;
+  const { token, password } = req.body;
 
-	try {
-		const hashedResetToken = crypto
-			.createHash("sha256")
-			.update(token)
-			.digest("hex");
+  try {
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
-		const user = await User.findOne({
-			resetToken: hashedResetToken,
-			resetTokenExpiry: { $gt: new Date() },
-		});
+    const user = await User.findOne({
+      resetToken: hashedResetToken,
+      resetTokenExpiry: { $gt: new Date() },
+    });
 
-		if (!user) {
-			return res
-				.status(400)
-				.json({ message: "Invalid or expired reset token" });
-		}
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "Invalid or expired reset token" });
+    }
 
-		user.password = password;
-		user.resetToken = undefined;
-		user.resetTokenExpiry = undefined;
-		await user.save();
+    user.password = password;
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
 
-		res.json({ message: "Password reset successful" });
-	} catch (error) {
-		console.error("Reset password error:", error);
-		res.status(500).json({ message: "Server error" });
-	}
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
