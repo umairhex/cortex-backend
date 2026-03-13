@@ -20,6 +20,23 @@ A developer deploys the backend, connects their existing database through the in
 
 ---
 
+## Tech Stack
+
+- **Backend Framework**: Express.js
+- **Language**: TypeScript
+- **Database**: MongoDB, Mongoose, PostgreSQL
+- **Authentication**: JWT, Bcrypt
+- **Authorization**: Role-based access control
+- **File Uploads**: Multer
+- **Email**: Nodemailer
+- **Security**: Helmet, Express Rate Limit
+- **Validation**: Zod, Express Validator
+- **Middleware**: CORS, Cookie Parser
+- **Logging**: Pino
+- **Architecture**: Headless API with Storage Adapter Pattern
+
+---
+
 ## Key Features
 
 ### Storage Adapter Pattern
